@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from datetime import datetime
-from models.item import InventoryItem
-from database.client import supabase_insert_item
+from app.models.item import InventoryItem
+from app.database.client import supabase_insert_item
 
 router = APIRouter()
 
