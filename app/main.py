@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from api.endpoints import router as inventory_router
+from app.api.endpoints import router as inventory_router
 
 app = FastAPI()
 
