@@ -21,32 +21,30 @@ def extraer_epcs_limpios(data_bytes):
 
 def read_tag(count=5):
     """Continuously read RFID tags until `count` EPCs are read."""
-    with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=TIMEOUT) as ser:
-        print(f"🧪 Starting to read {count} EPCs...")
-        read_count = 0
-        try:
-            while read_count < count:
-                ser.write(READ_SINGLE_CMD)
-                data = ser.read(128)
-                if data:
-                    epcs = extraer_epcs_limpios(data)
-                    for epc in epcs:
-                        read_count += 1
-                        print(f"[{read_count}] EPC: {epc}")
-                        if epc:
-                            text = hex2txt(epc.replace(' ', ''))
-                            print(f"📦 EPC Text: {text}")
-                        else:
-                            print("⚠️ Empty EPC received")
-                        if read_count >= count:
-                            break
-                else:
-                    print("⚠️ No data received")
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("\n⛔ Reading interrupted by user.")
-        finally:
-            print("✅ Reading complete.")
+    ser = serial.Serial(SERIAL_PORT, BAUDRATE, timeout=1)
+    time.sleep(1)  # Wait for the serial connection to initialize
+    print(f"🧪 Starting to read {count} EPCs...")
+    read_count = 0
+
+    try:
+        while read_count < count:
+            ser.write(READ_SINGLE_CMD)
+            data = ser.read(128)
+            if data:
+                epcs = extraer_epcs_limpios(data)
+                for epc in epcs:
+                    read_count += 1
+                    print(f"[{read_count}] {epc}")
+                    print("📦 EPC:", hex2txt(epc))
+                    if read_count >= count:
+                        break
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n⛔ Test interrumpido.")
+    finally:
+        print("✅ Test completo.")
+        ser.close()
+
 if __name__ == "__main__":
     while True:
         data = read_tag()
