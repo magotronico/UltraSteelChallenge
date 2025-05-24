@@ -19,7 +19,7 @@ if __name__ == "__main__":
     rfid = RFIDModule()
 
     # Test write
-    sample_data = "ABC123-LOT45-20240522-JD"
+    sample_data = "hello"
 
     # Write sample data to tag
     print(f"📝 Writing tag: {sample_data}")

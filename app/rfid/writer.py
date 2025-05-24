@@ -21,19 +21,21 @@ def write_tag(data: str):
     hex_payload = txt2hex(formatted)
     data_bytes = list(bytes.fromhex(hex_payload))
 
-    full_cmd = WRITE_TAG_CMD_BASE + data_bytes
-    checksum = calc_checksum(full_cmd)
-    full_cmd.append(checksum)
-    full_cmd.append(0xDD)
+    # Params: bank(1) + word ptr(1) + word count(1) + data(16 bytes = 8 words)
+    param = [0x03, 0x00, 0x08] + data_bytes
+    param_len = len(param)
+
+    cmd = [0xAA, 0x00, 0x49, 0x00, param_len] + param
+    checksum = sum(cmd[1:]) & 0xFF
+    cmd.append(checksum)
+    cmd.append(0xDD)
 
     with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=TIMEOUT) as ser:
-        # Wake/select tag first
-        ser.write(READ_SINGLE_CMD)
+        ser.write(READ_SINGLE_CMD)  # optional pre-select
         time.sleep(0.1)
         ser.flushInput()
 
-        # Send write command
-        ser.write(bytes(full_cmd))
+        ser.write(bytes(cmd))
         time.sleep(0.2)
         response = ser.read(64)
 
@@ -50,5 +52,5 @@ def write_tag(data: str):
             print("✅ Write successful")
             return True
         else:
-            print(f"⚠️ Write failed, status code: {hex(status_code)}")
+            print(f"❌ Write failed, status code: {hex(status_code)}")
             return False
