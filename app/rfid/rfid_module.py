@@ -23,11 +23,11 @@ if __name__ == "__main__":
 
     # Write sample data to tag
     print(f"📝 Writing tag: {sample_data}")
-    write_tag(sample_data)
+    rfid.write(sample_data)
 
     # Read back the tag
     print("🔍 Reading tag...")
-    result = read_tag()
+    result = rfid.read()
 
     # Display the result
     if result:
