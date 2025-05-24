@@ -19,7 +19,7 @@ def extraer_epcs_limpios(data_bytes):
 
 
 
-def read_tag(count=5):
+def read_tag(count=1):
     """Continuously read RFID tags until `count` EPCs are read."""
     ser = serial.Serial(SERIAL_PORT, BAUDRATE, timeout=1)
     time.sleep(1)  # Wait for the serial connection to initialize
