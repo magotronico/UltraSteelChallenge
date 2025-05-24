@@ -3,7 +3,7 @@
 def txt2hex(text: str) -> str:
     return text.encode('utf-8').hex()
 
-def hex_to_text(hex_str: str) -> str:
+def hex2txt(hex_str: str) -> str:
     """
     Convert a hex string (e.g. '414243') to ASCII text ('ABC').
     Removes any padding underscores or nulls.
