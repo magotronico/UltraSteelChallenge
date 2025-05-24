@@ -3,7 +3,7 @@
 import serial
 import time
 from app.config import SERIAL_PORT, BAUDRATE, TIMEOUT
-from app.rfid.commands import WRITE_TAG_CMD_BASE
+from app.rfid.commands import WRITE_TAG_CMD_BASE, READ_SINGLE_CMD
 from app.utils.hex_conv import txt2hex
 
 def calc_checksum(cmd: list) -> int:
@@ -14,7 +14,7 @@ def format_data(text: str) -> str:
     if len(text) > 24:
         print("⚠️ Data too long, trimming to 24 characters")
         text = text[:24]
-    return text.ljust(24, "_")  # Pad with underscores for consistency
+    return text.ljust(24, "_")
 
 def write_tag(data: str):
     formatted = format_data(data)
@@ -27,12 +27,22 @@ def write_tag(data: str):
     full_cmd.append(0xDD)
 
     with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=TIMEOUT) as ser:
+        # Wake/select tag first
+        ser.write(READ_SINGLE_CMD)
+        time.sleep(0.1)
+        ser.flushInput()
+
+        # Send write command
         ser.write(bytes(full_cmd))
         time.sleep(0.2)
         response = ser.read(64)
 
-        if not response or response[0] != 0xAA or response[-1] != 0xDD:
-            print("❌ Write failed or invalid response")
+        if not response or len(response) < 7:
+            print("❌ No response")
+            return False
+
+        if response[0] != 0xAA or response[-1] != 0xDD:
+            print("❌ Invalid frame")
             return False
 
         status_code = response[5]
@@ -40,5 +50,5 @@ def write_tag(data: str):
             print("✅ Write successful")
             return True
         else:
-            print(f"⚠️ Write failed, status code: {status_code}")
+            print(f"⚠️ Write failed, status code: {hex(status_code)}")
             return False
