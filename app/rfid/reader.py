@@ -2,38 +2,37 @@
 
 import serial
 import time
+import re
 from app.config import SERIAL_PORT, BAUDRATE, TIMEOUT
-from app.rfid.commands import READ_SINGLE_CMD, READ_TAG_CMD
-from app.utils.hex_conv import hex2txt
+from app.rfid.commands import READ_SINGLE_CMD
+
+def extraer_epcs_limpios(data_bytes):
+    """Extract EPCs (12 bytes starting with E2) from the response."""
+    epcs = []
+    data_hex = ' '.join(f'{b:02X}' for b in data_bytes)
+    # Extract 12-byte EPCs starting with E2
+    matches = re.findall(r'(E2(?: [0-9A-F]{2}){11})', data_hex)
+    for m in matches:
+        epcs.append(m)
+    return epcs
 
 def read_tag():
+    """
+    Read EPCs from an RFID tag using READ_SINGLE_CMD.
+    Returns a list of EPCs found in the response, or None if no EPCs are found.
+    """
     with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=TIMEOUT) as ser:
-        # Inventory - ensure tag is present
         ser.write(READ_SINGLE_CMD)
         time.sleep(0.1)
-        ser.flushInput()
+        response = ser.read(128)
 
-        # Read User memory (24 bytes)
-        ser.write(READ_TAG_CMD)
-        time.sleep(0.2)
-        response = ser.read(64)
-
-        if not response or len(response) < 10:
-            print("⚠️ No valid response")
+        if not response:
+            print("⚠️ No response")
             return None
 
-        if response[0] != 0xAA or response[-1] != 0xDD:
-            print("❌ Invalid frame")
+        epcs = extraer_epcs_limpios(response)
+        if not epcs:
+            print("⚠️ No EPCs found in response")
             return None
 
-        payload = response[7:-2]  # Skip header + command metadata + checksum
-        if not payload:
-            print("⚠️ No data in tag")
-            return None
-
-        try:
-            return hex2txt(payload.hex())
-        except Exception as e:
-            print(f"❌ Failed to decode hex: {e}")
-            return None
-
+        return epcs
