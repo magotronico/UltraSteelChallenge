@@ -1,66 +1,60 @@
-# UltraSteelChallenge/rfid/writer.py
 import serial
 import time
-from app.config import SERIAL_PORT, BAUDRATE, TIMEOUT
-from app.rfid.commands import READ_SINGLE_CMD
-from app.utils.hex_conv import txt2hex
 
+PORT = 'COM6'
+BAUDRATE = 115200
 
-def calc_checksum(cmd: list) -> int:
-    return sum(cmd[1:]) & 0xFF
+def calculate_checksum(frame_bytes):
+    return sum(frame_bytes) & 0xFF
 
+def write_epc_data(data_str):
+    if len(data_str) > 12:
+        raise ValueError("❌ Maximum 12 characters (12 bytes / 6 words) allowed.")
 
-def format_data(text: str) -> str:
-    text = text.strip()
-    # Max 24 bytes (12 words), safe limit for many tags
-    if len(text) > 24:
-        print("⚠️ Too long. Trimming to 24 chars.")
-        text = text[:24]
-    # Ensure even number of bytes (pad with underscore)
-    if len(text) % 2 != 0:
-        text += "_"
-    return text
+    # Convert string to bytes and pad to 12 bytes if needed
+    data_bytes = list(data_str.encode('ascii'))
+    data_bytes += [0x00] * (12 - len(data_bytes))
 
+    # Build command fields
+    header = [0xAA]
+    frame_type = [0x00]
+    command = [0x49]
+    access_password = [0x00, 0x00, 0x00, 0x00]
+    membank = [0x01]  # EPC memory
+    word_pointer = [0x00, 0x02]
+    word_count = [0x00, 0x06]  # 6 words = 12 bytes
+    parameters = access_password + membank + word_pointer + word_count + data_bytes
+    param_len = [len(parameters) >> 8, len(parameters) & 0xFF]
 
-def write_tag(data: str):
-    formatted = format_data(data)
-    hex_payload = txt2hex(formatted)
-    data_bytes = list(bytes.fromhex(hex_payload))
+    # Combine full frame
+    body = frame_type + command + param_len + parameters
+    checksum = [calculate_checksum(body)]
+    end_byte = [0xDD]
+    frame = header + body + checksum + end_byte
 
-    word_count = len(data_bytes) // 2  # Each word is 2 bytes
+    # Send frame to reader
+    ser = serial.Serial(PORT, BAUDRATE, timeout=1)
+    time.sleep(1)
+    ser.write(bytes(frame))
+    time.sleep(1)  # Esperar un poco para que el lector procese
+    response = ser.read(64)
+    ser.close()
 
-    # Write command structure:
-    # [AA] [00] [0x49] [00] [LEN] [BANK=03] [ADDR=00] [WORDCNT] + [DATA...] + [CHECKSUM] [DD]
-    param = [0x03, 0x00, word_count] + data_bytes
-    param_len = len(param)
-    cmd = [0xAA, 0x00, 0x49, 0x00, param_len] + param
-    checksum = calc_checksum(cmd)
-    cmd.append(checksum)
-    cmd.append(0xDD)
+    print("\n📤 Enviado:")
+    print(' '.join(f'{b:02X}' for b in frame))
 
-    with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=TIMEOUT) as ser:
-        # Pre-select tag
-        ser.write(READ_SINGLE_CMD)
-        time.sleep(0.1)
-        ser.flushInput()
-
-        # Write to tag
-        ser.write(bytes(cmd))
-        time.sleep(0.2)
-        response = ser.read(64)
-
-        if not response or len(response) < 7:
-            print("❌ No response")
-            return False
-
-        if response[0] != 0xAA or response[-1] != 0xDD:
-            print("❌ Invalid frame")
-            return False
-
-        status_code = response[5]
-        if status_code == 0x10:
-            print(f"✅ Write successful: '{formatted}'")
-            return True
+    if response:
+        print("📥 Respuesta recibida:")
+        response2 = [f'{b:02X}' for b in response]
+        print(' '.join(f'{b:02X}' for b in response))
+        if response2[2] == '49':
+            print("✅ Escritura exitosa.")
+        elif response[2] == 'FF':
+            print(f"❌ Error del lector. Código: {response[5]:02X}")
         else:
-            print(f"❌ Write failed, status code: {hex(status_code)}")
-            return False
+            print("⚠ Respuesta inesperada.")
+    else:
+        print("❌ No hubo respuesta del lector.")
+
+# ▶ Example usage
+write_epc_data("a")
