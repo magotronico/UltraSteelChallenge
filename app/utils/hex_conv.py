@@ -1,17 +1,16 @@
 # UltraSteelChallenge/app/utils/hex_conv.py
 
 def txt2hex(text: str) -> str:
-    return text.encode('utf-8').hex()
+    # Convierte texto ASCII a string hex sin espacios, ej: "hello" -> "68656C6C6F"
+    try:
+        return ''.join(f'{ord(c):02X}' for c in text)
+    except Exception:
+        return ""
 
 def hex2txt(hex_str: str) -> str:
-    """
-    Convert a hex string (e.g. '414243') to ASCII text ('ABC').
-    Removes any padding underscores or nulls.
-    """
+    # Convierte string hex sin espacios a ASCII, ej: "68656C6C6F" -> "hello"
     try:
-        bytes_data = bytes.fromhex(hex_str)
-        text = bytes_data.decode('ascii').rstrip('\x00').rstrip('_')
-        return text
-    except Exception as e:
-        print(f"Error decoding hex to text: {e}")
+        bytes_obj = bytes.fromhex(hex_str)
+        return bytes_obj.decode('ascii')
+    except Exception:
         return ""

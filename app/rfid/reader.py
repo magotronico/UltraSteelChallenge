@@ -1,43 +1,52 @@
 import serial
 import time
+import re
 
-PORT = 'COM6'
-BAUDRATE = 115200
+def read_tags_loop(port='COM6', baudrate=115200, interval=1):
+    def split_tags(data_string):
+        data_string = data_string.strip()
+        return re.findall(r'AA(?: [0-9A-F]{2})*? DD', data_string)
 
-# Comando de lectura EPC (puede variar según el lector)
-read_epc_cmd = bytes([
-    0xAA, 0x00, 0x22, 0x00, 0x00,  # Ejemplo de comando genérico para leer EPC
-    0x22, 0xDD                     # Comando puede necesitar ajuste si usas otro protocolo
-])
-
-# Abrir puerto
-ser = serial.Serial(PORT, BAUDRATE, timeout=1)
-time.sleep(1)
-ser.write(read_epc_cmd)
-
-# Leer respuesta
-response = ser.read(64)
-ser.close()
-
-if response:
-    print("\n📥 Respuesta recibida:")
-    print(' '.join(f'{b:02X}' for b in response))
+    read_cmd = bytes([
+        0xAA, 0x00, 0x22, 0x00, 0x00,
+        0x22, 0xDD
+    ])
 
     try:
-        # Buscar el encabezado del paquete
-        header_index = response.index(0xAA)
-        epc_len = response[header_index + 2] // 2
-        epc_data = response[header_index + 8:header_index + 3 + epc_len]
-        print(epc_len, header_index, epc_data)
-        
-        # Mostrar EPC
-        print("✅ EPC (HEX):", ' '.join(f'{b:02X}' for b in epc_data))
-        try:
-            epc_ascii = ''.join(chr(b) for b in epc_data if 32 <= b <= 126)
-            print("✅ EPC (ASCII):", epc_ascii)
-        except:
-            pass
-    except Exception as e:
-        print("⚠ No se pudo extraer el EPC:", e)
-else:
-    print("❌ No hubo respuesta del lector.")
+        ser = serial.Serial(port, baudrate, timeout=1)
+        print("📡 Escaneando etiquetas RFID. Presiona Ctrl+C para detener.\n")
+        while True:
+            ser.write(read_cmd)
+            response = ser.read(64)
+
+            if response:
+                response_str = ' '.join(f'{b:02X}' for b in response)
+                tags = split_tags(response_str)
+                print(f"\n🔍 Etiquetas encontradas: {len(tags)}")
+
+                for tag in tags:
+                    tag_parts = tag.split(" ")
+                    try:
+                        header_index = tag_parts.index('AA')
+                        epc_len = int(tag_parts[header_index + 2], 16) // 2
+                        epc_data = tag_parts[header_index + 8:header_index + 3 + epc_len]
+                        print("✅ EPC (HEX):", ' '.join(epc_data))
+                        epc_ascii = ''.join(chr(int(b, 16)) for b in epc_data if 32 <= int(b, 16) <= 126)
+                        print("✅ EPC (ASCII):", epc_ascii)
+                    except Exception as e:
+                        print("⚠ No se pudo extraer el EPC:", e)
+            else:
+                print("\n❌ No se detectó respuesta del lector.")
+
+            time.sleep(interval)
+
+    except KeyboardInterrupt:
+        print("\n🛑 Lectura detenida por el usuario.")
+    except Exception as err:
+        print("⚠ Error al comunicar con el puerto serial:", err)
+    finally:
+        if 'ser' in locals() and ser.is_open:
+            ser.close()
+
+# Para ejecutar
+read_tags_loop()
