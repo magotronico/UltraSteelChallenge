@@ -1,18 +1,16 @@
 import serial
 import time
 import re
+from app.config import SERIAL_PORT, BAUDRATE
 
-PORT = 'COM6'
+SERIAL_PORT = 'COM6'
 BAUDRATE = 115200
-
-def calculate_checksum(frame_bytes):
-    return sum(frame_bytes) & 0xFF
 
 def split_tags(data_string):
     data_string = data_string.strip()
     return re.findall(r'AA(?: [0-9A-F]{2})*? DD', data_string)
 
-def read_tags_loop(port=PORT, baudrate=BAUDRATE, interval=1):
+def read_tags_loop(port=SERIAL_PORT, baudrate=BAUDRATE, interval=1):
     read_cmd = bytes([
         0xAA, 0x00, 0x22, 0x00, 0x00,
         0x22, 0xDD
@@ -36,9 +34,8 @@ def read_tags_loop(port=PORT, baudrate=BAUDRATE, interval=1):
                         header_index = tag_parts.index('AA')
                         epc_len = int(tag_parts[header_index + 2], 16) // 2
                         epc_data = tag_parts[header_index + 8:header_index + 3 + epc_len]
-                        print("✅ EPC (HEX):", ' '.join(epc_data))
                         epc_ascii = ''.join(chr(int(b, 16)) for b in epc_data if 32 <= int(b, 16) <= 126)
-                        print("✅ EPC (ASCII):", epc_ascii)
+                        print("✅ EPC (HEX):", ' '.join(epc_data), "\nEPC (ASCII):", epc_ascii)
                     except Exception as e:
                         print("⚠ No se pudo extraer el EPC:", e)
             else:
@@ -72,11 +69,11 @@ def write_epc_data(data_str):
     param_len = [len(parameters) >> 8, len(parameters) & 0xFF]
 
     body = frame_type + command + param_len + parameters
-    checksum = [calculate_checksum(body)]
+    checksum = [sum(body) & 0xFF]
     end_byte = [0xDD]
     frame = header + body + checksum + end_byte
 
-    ser = serial.Serial(PORT, BAUDRATE, timeout=1)
+    ser = serial.Serial(SERIAL_PORT, BAUDRATE, timeout=1)
     time.sleep(1)
     ser.write(bytes(frame))
     time.sleep(1)
@@ -100,22 +97,19 @@ def write_epc_data(data_str):
         print("❌ No hubo respuesta del lector.")
 
 def main():
-    print("=== LECTOR / ESCRITOR RFID ===")
-    print("1. Leer etiquetas")
-    print("2. Escribir EPC")
-    option = input("Selecciona una opción (1/2): ").strip()
+    while True:
+        print("=== LECTOR / ESCRITOR RFID ===")
+        print("1. Leer etiquetas")
+        print("2. Escribir EPC")
+        option = input("Selecciona una opción (1/2): ").strip()
 
-    if option == '1':
-        read_tags_loop()
-    elif option == '2':
-        epc_data = input("Ingresa el texto a escribir (máx 12 caracteres): ").strip()
-        write_epc_data(epc_data)
-    else:
-        print("❌ Opción no válida.")
+        if option == '1':
+            read_tags_loop()
+        elif option == '2':
+            epc_data = input("Ingresa el texto a escribir (máx 12 caracteres): ").strip()
+            write_epc_data(epc_data)
+        else:
+            print("❌ Opción no válida.")
 
 if __name__ == "__main__":
     main()
-
-
-# [PROD] [DATE] [INITIALS] [LOT]
-# [000-999] [22425] [DC] [00-99]

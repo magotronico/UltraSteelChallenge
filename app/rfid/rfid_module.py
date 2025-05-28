@@ -1,36 +1,69 @@
 # UltraSteelChallenge/app/rfid/rfid_module.py
 
-from app.rfid.reader import read_tag
+from app.rfid.reader import *
 from app.rfid.writer import write_tag
-from app.utils.hex_conv import txt2hex, hex2txt
 
 class RFIDModule:
-    def read(self) -> str | None:
-        hex_data = read_tag()
-        if hex_data:
-            return hex2txt(hex_data)
-        return None
+    def write(self, text: str): 
+        write_tag(text)
+    
+    def start_reading(self):
+        """
+        Start reading RFID tags continuously
+        """
+        def on_tag_detected(epc_ascii):
+            print(f"✅ Tag leído: {epc_ascii}")
+            # Add a function to save the tag to a database
 
-    def write(self, text: str):
-        hex_data = txt2hex(text)
-        write_tag(hex_data)
+        start_reading(callback=on_tag_detected)
+
+    def stop_reading(self):
+        """
+        Stop reading RFID tags
+        """
+        stop_reading()
 
 if __name__ == "__main__":
     rfid = RFIDModule()
+    reading = False
 
-    # Test write
-    sample_data = "hello"
+    while True:
+        print("\n📋 MENU RFID")
+        print("1. Escribir etiqueta")
+        print("2. Iniciar lectura continua")
+        print("3. Detener lectura")
+        print("4. Salir")
 
-    # Write sample data to tag
-    print(f"📝 Writing tag: {sample_data}")
-    rfid.write(sample_data)
+        choice = input("Selecciona una opción: ")
 
-    # Read back the tag
-    print("🔍 Reading tag...")
-    result = rfid.read()
+        if choice == '1':
+            data = input("🔤 Ingresa el texto a escribir en la etiqueta: ")
+            rfid.write(data)
+            print("✅ Etiqueta escrita.")
 
-    # Display the result
-    if result:
-        print(f"✅ Read: {result}")
-    else:
-        print("❌ No tag read")
+        elif choice == '2':
+            if not reading:
+                rfid.start_reading()
+                reading = True
+                print("📡 Leyendo etiquetas... (presiona opción 3 para detener)")
+            else:
+                print("⚠ La lectura ya está en curso.")
+
+        elif choice == '3':
+            if reading:
+                rfid.stop_reading()
+                reading = False
+                print("🛑 Lectura detenida.")
+            else:
+                print("⚠ La lectura no está activa.")
+
+        elif choice == '4':
+            if reading:
+                rfid.stop_reading()
+            print("👋 Saliendo...")
+            break
+
+        else:
+            print("❌ Opción no válida.")
+
+        time.sleep(1)
