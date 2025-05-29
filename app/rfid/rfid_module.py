@@ -2,30 +2,56 @@
 
 from app.rfid.reader import *
 from app.rfid.writer import write_tag
+from app.database.client import init_db, add_item
+from app.models.item import InventoryItem as item
 
 class RFIDModule:
+    def __init__(self):
+        """
+        Initialize the RFID module
+        """
+        self.reading = False
+
     def write(self, text: str): 
+        """
+        Write text to an RFID tag
+        :param text: Text to write to the tag
+        """
         write_tag(text)
     
     def start_reading(self):
         """
         Start reading RFID tags continuously
         """
+        if self.reading:
+            print("⚠ Reading is already active.")
+            return
+        
         def on_tag_detected(epc_ascii):
             print(f"✅ Tag leído: {epc_ascii}")
-            # Add a function to save the tag to a database
+            new_tag = item.from_epc_ascii(epc_ascii)
+            result = add_item(new_tag)
+            if result == 1:
+                print("✅ Tag added to the database.")
+            else:
+                print("❌ Tag already exists in the database.")
 
         start_reading(callback=on_tag_detected)
+        self.reading = True
 
     def stop_reading(self):
         """
         Stop reading RFID tags
         """
-        stop_reading()
+        if self.reading:
+            stop_reading()
+            self.reading = False
+        else:
+            print("⚠ Reading is not active.")
+        
 
 if __name__ == "__main__":
     rfid = RFIDModule()
-    reading = False
 
     while True:
         print("\n📋 MENU RFID")
@@ -42,23 +68,19 @@ if __name__ == "__main__":
             print("✅ Etiqueta escrita.")
 
         elif choice == '2':
-            if not reading:
+            if not rfid.reading:
                 rfid.start_reading()
-                reading = True
-                print("📡 Leyendo etiquetas... (presiona opción 3 para detener)")
             else:
-                print("⚠ La lectura ya está en curso.")
+                print("⚠ Reading is already active.")
 
         elif choice == '3':
-            if reading:
+            if rfid.reading:
                 rfid.stop_reading()
-                reading = False
-                print("🛑 Lectura detenida.")
             else:
-                print("⚠ La lectura no está activa.")
+                print("⚠ Reading is not active.")
 
         elif choice == '4':
-            if reading:
+            if rfid.reading:
                 rfid.stop_reading()
             print("👋 Saliendo...")
             break
