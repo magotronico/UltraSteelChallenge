@@ -1,0 +1,5 @@
+sku,lot,uid,received_by,date,status
+2,A1,A44,DC,22425,1
+3,A2,A55,DC,22426,1
+3,A2,A56,DC,22427,1
+3,A2,A58,DC,22428,0

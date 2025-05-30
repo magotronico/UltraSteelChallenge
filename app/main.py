@@ -1,12 +1,16 @@
 # UltraSteelChallenge/app/main.py
 
-from fastapi import FastAPI, Request
-from app.api.endpoints import router as inventory_router
+from fastapi import FastAPI
+from app.api.endpoints import router as api_router
 
-app = FastAPI()
+app = FastAPI(
+    title="RFID API",
+    version="1.0.0"
+)
 
-app.include_router(inventory_router, prefix="/inventory")
+app.include_router(api_router)
 
-@app.get("/")
-def root():
-    return {"status": "RFID FastAPI server running"}
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
