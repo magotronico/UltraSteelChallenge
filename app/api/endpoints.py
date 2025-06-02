@@ -20,6 +20,7 @@ def add_inventory(item: InventoryItem):
     """
     try:
         result = db.add_item(item)
+        print(f"Adding item: {item.to_dict()}")
         if result == 0:
             raise HTTPException(status_code=400, detail="Item already exists")
         return {"message": "Item added", "data": item.to_dict()}
@@ -93,7 +94,6 @@ def modify_item(uid: str, updated_item: InventoryItem):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.delete("/delete_item/{uid}")
 def remove_item(uid: str):
     """
@@ -118,7 +118,6 @@ def start_reading():
         return {"message": "RFID reading started"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/stop_reading")
 def stop_reading():
