@@ -28,13 +28,15 @@ class RFIDModule:
             return
         
         def on_tag_detected(epc_ascii):
-            print(f"✅ Tag leído: {epc_ascii}")
-            new_tag = item.from_epc_ascii(epc_ascii)
-            result = add_item(new_tag)
-            if result == 1:
-                print("✅ Tag added to the database.")
-            else:
-                print("❌ Tag already exists in the database.")
+            if epc_ascii:
+                print(f"✅ Tag read: {epc_ascii}, length: {len(epc_ascii)}")
+            if len(epc_ascii) == 12:
+                new_tag = item.from_epc_ascii(epc_ascii)
+                result = add_item(new_tag)
+                if result == 1:
+                    print("✅ Tag added to the database.")
+                else:
+                    print("❌ Tag already exists in the database.")
 
         start_reading(callback=on_tag_detected)
         self.reading = True

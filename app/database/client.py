@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.models.item import InventoryItem
 
 CSV_FILE = Path("app/database/inventory.csv")
-FIELDS = ["sku", "lot", "uid", "received_by", "date", "status"]
+FIELDS = ["sku", "lot", "uid", "received_by", "date", "status", "price"]
 
 
 def init_db(file_path: Path = CSV_FILE):
