@@ -1,6 +1,6 @@
 import type { InventoryItem } from "@/types/inventory"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://d594-131-178-102-168.ngrok-free.app"
 
 class ApiService {
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {

@@ -19,7 +19,7 @@ import { Plus, Loader2, Calendar, Info } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { InventoryItem } from "@/types/inventory"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://192.168.1.12:8000"; // Fallback to a default if not found
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://d594-131-178-102-168.ngrok-free.app"; // Fallback to a default if not found
 
 interface AddItemDialogProps {
   onItemAdded: () => void
