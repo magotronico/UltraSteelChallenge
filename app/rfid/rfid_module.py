@@ -2,7 +2,7 @@
 
 from app.rfid.reader import *
 from app.rfid.writer import write_tag
-from app.database.client import init_db, add_item
+from app.database.client import exit_item, init_db, add_item
 from app.models.item import InventoryItem as item
 
 class RFIDModule:
@@ -37,6 +37,28 @@ class RFIDModule:
                     print("✅ Tag added to the database.")
                 else:
                     print("❌ Tag already exists in the database.")
+
+        start_reading(callback=on_tag_detected)
+        self.reading = True
+
+    def start_reading_exits(self):
+        """
+        Start reading RFID tags continuously
+        """
+        if self.reading:
+            print("⚠ Reading is already active.")
+            return
+        
+        def on_tag_detected(epc_ascii):
+            if epc_ascii:
+                print(f"✅ Tag read: {epc_ascii}, length: {len(epc_ascii)}")
+            if len(epc_ascii) == 12:
+                new_tag = item.from_epc_ascii(epc_ascii)
+                result = exit_item(new_tag.uid)
+                if result == True:
+                    print("✅ Tag status updated to exited.")
+                else:
+                    print("❌ Tag failed to update status or does not exist in the database.")
 
         start_reading(callback=on_tag_detected)
         self.reading = True
