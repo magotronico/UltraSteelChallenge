@@ -126,6 +126,9 @@ This project demonstrates how RFID traceability aligns with ISO 9001 by supporti
 - RFID read scripts are in `app/rfid/`
 - Database client scripts in `app/api/database/`
 
+<div align="center">
+  <img src="Resources\FunctionalDiagram.png" alt="Functional Diagram" width="550" style="margin: 0 10px;">
+</div>
 ---
 
 ## 📸 Screenshots
