@@ -118,6 +118,17 @@ def start_reading():
         return {"message": "RFID reading started"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/start_reading_exits")
+def start_reading():
+    """
+    Inicia la lectura RFID (modo continuo).
+    """
+    try:
+        rfid_module.start_reading_exits()
+        return {"message": "RFID reading started"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/stop_reading")
 def stop_reading():

@@ -6,26 +6,61 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Play, Square, Edit3, Loader2, AlertCircle, CheckCircle } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Play, Square, Edit3, Loader2, AlertCircle, CheckCircle, ArrowRight, ArrowLeft } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { JulianDatePicker } from "@/components/ui/julian-date-picker"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://192.168.1.12:8000"; // Fallback to a default if not found
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://10.22.206.2:8000"
 
 export function RFIDControls({ onStatusChange }: { onStatusChange: (status: "idle" | "reading" | "writing") => void }) {
   const [status, setStatus] = useState<"idle" | "reading" | "writing">("idle")
   const [tagData, setTagData] = useState("")
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isExitMode, setIsExitMode] = useState(false) // false = entrance, true = exit
+  const [isAdvancedWriteMode, setIsAdvancedWriteMode] = useState(false) // false = simple, true = advanced form
+
+  // Form data for advanced write mode
+  const [formData, setFormData] = useState({
+    sku: "",
+    lot: "",
+    uid: "",
+    received_by: "",
+    date: "",
+  })
 
   const showMessage = (type: "success" | "error", text: string) => {
     setMessage({ type, text })
     setTimeout(() => setMessage(null), 5000)
   }
 
+  // Generate Julian date format (%j%y) - day of year + 2-digit year
+  const generateJulianDate = () => {
+    const now = new Date()
+    const start = new Date(now.getFullYear(), 0, 0)
+    const diff = now.getTime() - start.getTime()
+    const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const twoDigitYear = now.getFullYear().toString().slice(-2)
+    return `${dayOfYear.toString().padStart(3, "0")}${twoDigitYear}`
+  }
+
+  const handleAutoFillDate = () => {
+    setFormData({ ...formData, date: generateJulianDate() })
+  }
+
+  // Function to generate tag data from form fields
+  const generateTagDataFromForm = () => {
+    // Concatenate fields, limiting to 12 characters total
+    const combinedData = `${formData.sku || ""}${formData.lot || ""}${formData.uid || ""}${formData.received_by || ""}${formData.date || ""}`
+    return combinedData.substring(0, 12) // Limit to 12 characters
+  }
+
   const handleStartReading = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch(`${API_BASE_URL}/start_reading`, {
+      const endpoint = isExitMode ? "/start_reading_exits" : "/start_reading"
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -39,7 +74,7 @@ export function RFIDControls({ onStatusChange }: { onStatusChange: (status: "idl
       const data = await response.json()
       setStatus("reading")
       onStatusChange("reading")
-      showMessage("success", data.message || "RFID reading started successfully")
+      showMessage("success", data.message || `RFID ${isExitMode ? "exit" : "entrance"} reading started successfully`)
     } catch (error) {
       console.error("Error starting RFID reading:", error)
       showMessage("error", `Failed to start RFID reading: ${error instanceof Error ? error.message : "Unknown error"}`)
@@ -76,12 +111,23 @@ export function RFIDControls({ onStatusChange }: { onStatusChange: (status: "idl
   }
 
   const handleWriteTag = async () => {
-    if (!tagData.trim()) return
+    // Use either simple tag data or generate from form based on mode
+    const dataToWrite = isAdvancedWriteMode ? generateTagDataFromForm() : tagData.trim()
+
+    if (!dataToWrite) {
+      showMessage("error", "Please enter data to write to the tag")
+      return
+    }
+
+    if (dataToWrite.length > 12) {
+      showMessage("error", "Tag data cannot exceed 12 characters")
+      return
+    }
 
     setStatus("writing")
     setIsLoading(true)
     try {
-      const response = await fetch(`${API_BASE_URL}/write_tag?data=${encodeURIComponent(tagData.trim())}`, {
+      const response = await fetch(`${API_BASE_URL}/write_tag?data=${encodeURIComponent(dataToWrite)}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -93,8 +139,21 @@ export function RFIDControls({ onStatusChange }: { onStatusChange: (status: "idl
       }
 
       const data = await response.json()
-      setTagData("")
-      showMessage("success", data.message || "Data written to RFID tag successfully")
+
+      // Reset form or simple input based on mode
+      if (isAdvancedWriteMode) {
+        setFormData({
+          sku: "",
+          lot: "",
+          uid: "",
+          received_by: "",
+          date: "",
+        })
+      } else {
+        setTagData("")
+      }
+
+      showMessage("success", data.message || `Data "${dataToWrite}" written to RFID tag successfully`)
     } catch (error) {
       console.error("Error writing to RFID tag:", error)
       showMessage("error", `Failed to write to RFID tag: ${error instanceof Error ? error.message : "Unknown error"}`)
@@ -123,7 +182,31 @@ export function RFIDControls({ onStatusChange }: { onStatusChange: (status: "idl
                 {status === "reading" ? "Active" : "Inactive"}
               </Badge>
             </CardTitle>
-            <CardDescription>Start or stop RFID tag scanning</CardDescription>
+            <CardDescription>
+              Start or stop RFID tag scanning for {isExitMode ? "exit" : "entrance"} tracking
+            </CardDescription>
+
+            {/* Mode Toggle - moved here */}
+            <div className="flex items-center justify-between pt-2 border-t">
+              <div className="flex items-center space-x-2">
+                <ArrowRight className="h-4 w-4 text-green-600" />
+                <Label htmlFor="mode-toggle" className="text-sm font-medium">
+                  Entrance
+                </Label>
+              </div>
+              <Switch
+                id="mode-toggle"
+                checked={isExitMode}
+                onCheckedChange={setIsExitMode}
+                disabled={status === "reading"}
+              />
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="mode-toggle" className="text-sm font-medium">
+                  Exit
+                </Label>
+                <ArrowLeft className="h-4 w-4 text-red-600" />
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-2">
@@ -131,7 +214,7 @@ export function RFIDControls({ onStatusChange }: { onStatusChange: (status: "idl
                 {status === "reading" ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Reading...
+                    Reading {isExitMode ? "Exits" : "Entrances"}...
                   </>
                 ) : isLoading ? (
                   <>
@@ -141,7 +224,7 @@ export function RFIDControls({ onStatusChange }: { onStatusChange: (status: "idl
                 ) : (
                   <>
                     <Play className="mr-2 h-4 w-4" />
-                    Start Reading
+                    Start {isExitMode ? "Exit" : "Entrance"} Reading
                   </>
                 )}
               </Button>
@@ -165,7 +248,9 @@ export function RFIDControls({ onStatusChange }: { onStatusChange: (status: "idl
               </Button>
             </div>
             <div className="text-sm text-muted-foreground">
-              {status === "reading" ? "RFID reader is actively scanning for tags..." : "RFID reader is stopped"}
+              {status === "reading"
+                ? `RFID reader is actively scanning for ${isExitMode ? "exit" : "entrance"} tags...`
+                : "RFID reader is stopped"}
             </div>
           </CardContent>
         </Card>
@@ -174,26 +259,145 @@ export function RFIDControls({ onStatusChange }: { onStatusChange: (status: "idl
           <CardHeader>
             <CardTitle>Write to RFID Tag</CardTitle>
             <CardDescription>Manually write data to an RFID tag</CardDescription>
+
+            {/* Toggle for simple/advanced write mode */}
+            <div className="flex items-center justify-between pt-2 border-t">
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="write-mode-toggle" className="text-sm font-medium">
+                  Simple
+                </Label>
+              </div>
+              <Switch
+                id="write-mode-toggle"
+                checked={isAdvancedWriteMode}
+                onCheckedChange={setIsAdvancedWriteMode}
+                disabled={status === "writing"}
+              />
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="write-mode-toggle" className="text-sm font-medium">
+                  Advanced
+                </Label>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="tag-data">Tag Data</Label>
-              <Input
-                id="tag-data"
-                placeholder="Enter data to write to tag..."
-                value={tagData}
-                onChange={(e) => setTagData(e.target.value)}
-                disabled={status === "writing" || isLoading}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && tagData.trim()) {
-                    handleWriteTag()
-                  }
-                }}
-              />
-            </div>
+            {isAdvancedWriteMode ? (
+              // Advanced form mode
+              <>
+                <div className="text-xs text-muted-foreground mb-2">
+                  Fields will be concatenated and limited to 12 characters
+                </div>
+
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="sku" className="text-xs">
+                        SKU
+                      </Label>
+                      <Input
+                        id="sku"
+                        placeholder="e.g., 5"
+                        value={formData.sku}
+                        onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                        disabled={status === "writing" || isLoading}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="lot" className="text-xs">
+                        Lot
+                      </Label>
+                      <Input
+                        id="lot"
+                        placeholder="e.g., A6"
+                        value={formData.lot}
+                        onChange={(e) => setFormData({ ...formData, lot: e.target.value })}
+                        disabled={status === "writing" || isLoading}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="uid" className="text-xs">
+                        UID
+                      </Label>
+                      <Input
+                        id="uid"
+                        placeholder="e.g., B3"
+                        value={formData.uid}
+                        onChange={(e) => setFormData({ ...formData, uid: e.target.value })}
+                        disabled={status === "writing" || isLoading}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="received_by" className="text-xs">
+                        Received By
+                      </Label>
+                      <Input
+                        id="received_by"
+                        placeholder="e.g., DC"
+                        value={formData.received_by}
+                        onChange={(e) => setFormData({ ...formData, received_by: e.target.value.toUpperCase() })}
+                        disabled={status === "writing" || isLoading}
+                        className="h-8 text-sm"
+                        style={{ textTransform: "uppercase" }}
+                        maxLength={5}
+                      />
+                    </div>
+                  </div>
+
+                  <JulianDatePicker
+                    id="date"
+                    label="Date"
+                    value={formData.date}
+                    onChange={(value: any) => setFormData({ ...formData, date: value })}
+                    placeholder="Julian date"
+                    disabled={status === "writing" || isLoading}
+                    className="flex-1"
+                  />
+
+                  <div className="pt-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <Label className="text-xs">Preview:</Label>
+                      <span className="text-xs text-muted-foreground">{generateTagDataFromForm().length}/12 chars</span>
+                    </div>
+                    <div className="bg-muted p-2 rounded text-sm font-mono overflow-hidden">
+                      {generateTagDataFromForm() || "Empty"}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              // Simple mode
+              <div className="space-y-2">
+                <Label htmlFor="tag-data">Tag Data</Label>
+                <Input
+                  id="tag-data"
+                  placeholder="Enter data to write to tag..."
+                  value={tagData}
+                  onChange={(e) => setTagData(e.target.value)}
+                  disabled={status === "writing" || isLoading}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && tagData.trim()) {
+                      handleWriteTag()
+                    }
+                  }}
+                  maxLength={12}
+                />
+                <div className="text-xs text-right text-muted-foreground">{tagData.length}/12 characters</div>
+              </div>
+            )}
+
             <Button
               onClick={handleWriteTag}
-              disabled={!tagData.trim() || status === "writing" || isLoading}
+              disabled={
+                (isAdvancedWriteMode ? !generateTagDataFromForm() : !tagData.trim()) ||
+                status === "writing" ||
+                isLoading
+              }
               className="w-full"
             >
               {status === "writing" ? (

@@ -1,6 +1,6 @@
 import type { InventoryItem } from "@/types/inventory"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://10.22.206.2:8000"
 
 class ApiService {
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -67,6 +67,10 @@ class ApiService {
 
   async startReading() {
     return this.request<{ message: string }>("/start_reading")
+  }
+
+  async startReadingExits() {
+    return this.request<{ message: string }>("/start_reading_exits")
   }
 
   async stopReading() {

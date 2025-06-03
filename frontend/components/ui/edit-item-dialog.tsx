@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -10,24 +10,27 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { Plus, Loader2, Info } from "lucide-react"
+import { Loader2, Info } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { JulianDatePicker } from "@/components/ui/julian-date-picker"
 import type { InventoryItem } from "@/types/inventory"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://10.22.206.2:8000"
 
-interface AddItemDialogProps {
-  onItemAdded: () => void
+interface EditItemDialogProps {
+  item: InventoryItem
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onItemUpdated: () => void
 }
 
-export function AddItemDialog({ onItemAdded }: AddItemDialogProps) {
-  const [open, setOpen] = useState(false)
+export function EditItemDialog({ item, open, onOpenChange, onItemUpdated }: EditItemDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     sku: "",
@@ -36,8 +39,24 @@ export function AddItemDialog({ onItemAdded }: AddItemDialogProps) {
     received_by: "",
     date: "",
     price: "",
+    status: "1" as "1" | "0",
   })
   const { toast } = useToast()
+
+  // Initialize form data when item changes
+  useEffect(() => {
+    if (item) {
+      setFormData({
+        sku: item.sku || "",
+        lot: item.lot || "",
+        uid: item.uid || "",
+        received_by: item.received_by || "",
+        date: item.date || "",
+        price: item.price?.toString() || "",
+        status: item.status || "1",
+      })
+    }
+  }, [item])
 
   // Generate Julian date format (%j%y) - day of year + 2-digit year
   const generateJulianDate = () => {
@@ -54,52 +73,42 @@ export function AddItemDialog({ onItemAdded }: AddItemDialogProps) {
     setIsLoading(true)
 
     try {
-      const item: InventoryItem = {
+      const updatedItem: InventoryItem = {
         sku: formData.sku.trim(),
         lot: formData.lot.trim(),
         uid: formData.uid.trim(),
         received_by: formData.received_by.trim().toUpperCase(),
         date: formData.date || generateJulianDate(),
-        status: "1", // Active by default
+        status: formData.status,
         price: formData.price ? Number.parseFloat(formData.price) : undefined,
       }
 
-      const response = await fetch(`${API_BASE_URL}/add_manually`, {
+      const response = await fetch(`${API_BASE_URL}/update_item/${item.uid}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(item),
+        body: JSON.stringify(updatedItem),
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        console.error("Server Response Error: ", errorData)
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
       }
 
       const result = await response.json()
       toast({
-        title: "Item Added Successfully",
-        description: `Item "${formData.sku}" has been added to inventory`,
+        title: "Item Updated Successfully",
+        description: `Item "${formData.sku}" has been updated`,
       })
 
-      // Reset form
-      setFormData({
-        sku: "",
-        lot: "",
-        uid: "",
-        received_by: "",
-        date: "",
-        price: "",
-      })
-      setOpen(false)
-      onItemAdded()
+      onItemUpdated()
+      onOpenChange(false)
     } catch (error) {
-      console.error("Error adding item:", error)
+      console.error("Error updating item:", error)
       toast({
-        title: "Error Adding Item",
-        description: error instanceof Error ? error.message : "Failed to add item to inventory",
+        title: "Error Updating Item",
+        description: error instanceof Error ? error.message : "Failed to update item",
         variant: "destructive",
       })
     } finally {
@@ -107,18 +116,16 @@ export function AddItemDialog({ onItemAdded }: AddItemDialogProps) {
     }
   }
 
+  const handleStatusChange = (checked: boolean) => {
+    setFormData({ ...formData, status: checked ? "1" : "0" })
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="w-full">
-          <Plus className="mr-2 h-4 w-4" />
-          Add Item
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden flex flex-col p-0">
         <DialogHeader className="p-6 pb-2">
-          <DialogTitle>Add New Item</DialogTitle>
-          <DialogDescription>Add a new item to your inventory manually</DialogDescription>
+          <DialogTitle>Edit Item</DialogTitle>
+          <DialogDescription>Update the item information</DialogDescription>
         </DialogHeader>
 
         <div className="overflow-y-auto px-6 flex-1" style={{ maxHeight: "calc(90vh - 180px)" }}>
@@ -127,11 +134,11 @@ export function AddItemDialog({ onItemAdded }: AddItemDialogProps) {
             <AlertDescription>Date format: Julian day + 2-digit year (e.g., 22125 = day 221 of 2025)</AlertDescription>
           </Alert>
 
-          <form id="add-item-form" onSubmit={handleSubmit} className="space-y-4 pb-4">
+          <form id="edit-item-form" onSubmit={handleSubmit} className="space-y-4 pb-4">
             <div className="grid gap-2">
-              <Label htmlFor="sku">SKU *</Label>
+              <Label htmlFor="edit-sku">SKU *</Label>
               <Input
-                id="sku"
+                id="edit-sku"
                 placeholder="What the item is (e.g., 5)"
                 value={formData.sku}
                 onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
@@ -140,9 +147,9 @@ export function AddItemDialog({ onItemAdded }: AddItemDialogProps) {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="lot">Lot Number *</Label>
+              <Label htmlFor="edit-lot">Lot Number *</Label>
               <Input
-                id="lot"
+                id="edit-lot"
                 placeholder="Lot number for tracking (e.g., A6)"
                 value={formData.lot}
                 onChange={(e) => setFormData({ ...formData, lot: e.target.value })}
@@ -151,20 +158,23 @@ export function AddItemDialog({ onItemAdded }: AddItemDialogProps) {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="uid">UID *</Label>
+              <Label htmlFor="edit-uid">UID *</Label>
               <Input
-                id="uid"
+                id="edit-uid"
                 placeholder="Unique identifier (e.g., B3)"
                 value={formData.uid}
                 onChange={(e) => setFormData({ ...formData, uid: e.target.value })}
                 required
+                disabled // UID should not be editable as it's the primary key
+                className="bg-muted"
               />
+              <p className="text-xs text-muted-foreground">UID cannot be changed</p>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="received_by">Received By *</Label>
+              <Label htmlFor="edit-received_by">Received By *</Label>
               <Input
-                id="received_by"
+                id="edit-received_by"
                 placeholder="Initials (e.g., DC)"
                 value={formData.received_by}
                 onChange={(e) => setFormData({ ...formData, received_by: e.target.value })}
@@ -175,18 +185,18 @@ export function AddItemDialog({ onItemAdded }: AddItemDialogProps) {
             </div>
 
             <JulianDatePicker
-              id="date"
+              id="edit-date"
               label="Date (Julian Format)"
               value={formData.date}
               onChange={(value: any) => setFormData({ ...formData, date: value })}
-              placeholder="e.g., 22125 (leave empty for today)"
+              placeholder="e.g., 22125"
               disabled={isLoading}
             />
 
             <div className="grid gap-2">
-              <Label htmlFor="price">Price (Optional)</Label>
+              <Label htmlFor="edit-price">Price (Optional)</Label>
               <Input
-                id="price"
+                id="edit-price"
                 type="number"
                 step="0.01"
                 min="0"
@@ -195,21 +205,39 @@ export function AddItemDialog({ onItemAdded }: AddItemDialogProps) {
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
               />
             </div>
+
+            <div className="grid gap-2">
+              <Label className="flex items-center gap-2">
+                Status
+                <Badge variant={formData.status === "1" ? "default" : "secondary"}>
+                  {formData.status === "1" ? "Active" : "Exited"}
+                </Badge>
+              </Label>
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="edit-status" className="text-sm">
+                  Exited
+                </Label>
+                <Switch id="edit-status" checked={formData.status === "1"} onCheckedChange={handleStatusChange} />
+                <Label htmlFor="edit-status" className="text-sm">
+                  Active
+                </Label>
+              </div>
+            </div>
           </form>
         </div>
 
         <DialogFooter className="p-6 pt-4 border-t">
-          <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancel
           </Button>
-          <Button type="submit" form="add-item-form" disabled={isLoading}>
+          <Button type="submit" form="edit-item-form" disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Adding...
+                Updating...
               </>
             ) : (
-              "Add Item"
+              "Update Item"
             )}
           </Button>
         </DialogFooter>

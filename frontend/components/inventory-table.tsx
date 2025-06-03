@@ -5,21 +5,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Search, RefreshCw, Trash2, ExternalLink } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
+import { MoreHorizontal, Search, RefreshCw, Trash2, ExternalLink, ArrowRight, Edit } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiService } from "@/lib/api-service"
+import { EditItemDialog } from "@/components/ui/edit-item-dialog"
 import type { InventoryItem } from "@/types/inventory"
 
 interface InventoryTableProps {
   items: InventoryItem[]
   isLoading: boolean
   onRefresh: () => void
-  getFormattedDate: (item: InventoryItem) => string 
+  getFormattedDate: (item: InventoryItem) => string
 }
 
-export function InventoryTable({ items, isLoading, onRefresh, getFormattedDate}: InventoryTableProps) {
+export function InventoryTable({ items, isLoading, onRefresh, getFormattedDate }: InventoryTableProps) {
   const [searchTerm, setSearchTerm] = useState("")
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const { toast } = useToast()
 
   const filteredItems = items.filter(
@@ -27,10 +35,10 @@ export function InventoryTable({ items, isLoading, onRefresh, getFormattedDate}:
       item.uid?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.lot?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.received_by?.toLowerCase().includes(searchTerm.toLowerCase())
-      || (item.date && new Date(item.date).toLocaleDateString().includes(searchTerm))
-      || item.status === "1" && "Active".toLowerCase().includes(searchTerm.toLowerCase())
-      || item.status === "0" && "Exited".toLowerCase().includes(searchTerm.toLowerCase())
+      item.received_by?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.date && new Date(item.date).toLocaleDateString().includes(searchTerm)) ||
+      (item.status === "1" && "Active".toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (item.status === "0" && "Exited".toLowerCase().includes(searchTerm.toLowerCase())),
   )
 
   const handleExitItem = async (uid: string) => {
@@ -45,6 +53,30 @@ export function InventoryTable({ items, isLoading, onRefresh, getFormattedDate}:
       toast({
         title: "Error",
         description: "Failed to exit item",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEntranceItem = async (uid: string) => {
+    try {
+      // Find the item to update its status back to active
+      const item = items.find((i) => i.uid === uid)
+      if (!item) {
+        throw new Error("Item not found")
+      }
+
+      const updatedItem: InventoryItem = { ...item, status: "1" }
+      await apiService.updateItem(uid, updatedItem)
+      toast({
+        title: "Item Re-entered",
+        description: `Item ${uid} has been marked as active`,
+      })
+      onRefresh()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to re-enter item",
         variant: "destructive",
       })
     }
@@ -65,6 +97,15 @@ export function InventoryTable({ items, isLoading, onRefresh, getFormattedDate}:
         variant: "destructive",
       })
     }
+  }
+
+  const handleEditItem = (item: InventoryItem) => {
+    setEditingItem(item)
+  }
+
+  const handleItemUpdated = () => {
+    setEditingItem(null)
+    onRefresh()
   }
 
   if (isLoading) {
@@ -116,7 +157,7 @@ export function InventoryTable({ items, isLoading, onRefresh, getFormattedDate}:
           <TableBody>
             {filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   No items found
                 </TableCell>
               </TableRow>
@@ -131,9 +172,7 @@ export function InventoryTable({ items, isLoading, onRefresh, getFormattedDate}:
                       {item.status === "1" ? "Active" : "Exited"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {getFormattedDate(item)}
-                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{getFormattedDate(item)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -142,11 +181,28 @@ export function InventoryTable({ items, isLoading, onRefresh, getFormattedDate}:
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleExitItem(item.uid)}>
-                          <ExternalLink className="mr-2 h-4 w-4" />
-                          Exit Item
+                        <DropdownMenuItem onClick={() => handleEditItem(item)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit Item
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteItem(item.uid)}>
+                        <DropdownMenuSeparator />
+                        {item.status === "1" ? (
+                          <DropdownMenuItem onClick={() => item.uid && handleExitItem(item.uid)}>
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Exit Item
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => item.uid && handleEntranceItem(item.uid)}>
+                            <ArrowRight className="mr-2 h-4 w-4" />
+                            Re-enter Item
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => item.uid && handleEntranceItem(item.uid)}
+                          disabled={!item.uid}
+                          className="text-destructive focus:text-destructive"
+                        >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
                         </DropdownMenuItem>
@@ -159,6 +215,16 @@ export function InventoryTable({ items, isLoading, onRefresh, getFormattedDate}:
           </TableBody>
         </Table>
       </div>
+
+      {/* Edit Item Dialog */}
+      {editingItem && (
+        <EditItemDialog
+          item={editingItem}
+          open={!!editingItem}
+          onOpenChange={(open) => !open && setEditingItem(null)}
+          onItemUpdated={handleItemUpdated}
+        />
+      )}
     </div>
   )
 }
