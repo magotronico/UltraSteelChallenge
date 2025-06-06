@@ -20,7 +20,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { JulianDatePicker } from "@/components/ui/julian-date-picker"
 import type { InventoryItem } from "@/types/inventory"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://10.22.206.2:8000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://10.22.193.238:8000"
 
 interface AddItemDialogProps {
   onItemAdded: () => void

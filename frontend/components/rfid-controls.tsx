@@ -11,7 +11,7 @@ import { Play, Square, Edit3, Loader2, AlertCircle, CheckCircle, ArrowRight, Arr
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { JulianDatePicker } from "@/components/ui/julian-date-picker"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://10.22.206.2:8000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://10.22.193.238:8000"
 
 export function RFIDControls({ onStatusChange }: { onStatusChange: (status: "idle" | "reading" | "writing") => void }) {
   const [status, setStatus] = useState<"idle" | "reading" | "writing">("idle")
